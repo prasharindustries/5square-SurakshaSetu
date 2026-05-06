@@ -164,6 +164,19 @@
             height: 12px;
             border-radius: 50%;
         }
+        .pdf-btn {
+            padding: 5px 10px;
+            background: #dc2626;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .pdf-btn:hover {
+            background: #b91c1c;
+        }
         @media (max-width: 768px) {
             .search-container {
                 flex-direction: column;
@@ -267,6 +280,12 @@
         let markersLayer;
         let searchTimeout;
         
+        // Helper function to get reports
+        function getReports() {
+            const stored = localStorage.getItem('surakshasetu_reports');
+            return stored ? JSON.parse(stored) : [];
+        }
+        
         async function searchPlaceInIndia(query) {
             if (!query || query.length < 2) return [];
             try {
@@ -276,12 +295,9 @@
                     name: item.display_name.split(',')[0],
                     fullName: item.display_name,
                     lat: parseFloat(item.lat),
-                    lon: parseFloat(item.lon),
-                    type: item.type,
-                    category: item.category
+                    lon: parseFloat(item.lon)
                 }));
             } catch (error) {
-                console.log('Search failed:', error);
                 return [];
             }
         }
@@ -346,7 +362,7 @@
             const results = await searchPlaceInIndia(query);
             if (results.length > 0) {
                 suggestionsDiv.innerHTML = results.map(item => `
-                    <div class="suggestion-item" data-name="${item.name}" data-full="${item.fullName}" data-lat="${item.lat}" data-lon="${item.lon}">
+                    <div class="suggestion-item" data-name="${item.name}" data-lat="${item.lat}" data-lon="${item.lon}">
                         <div class="suggestion-name">${item.name}</div>
                         <div class="suggestion-detail">${item.fullName.substring(0, 80)}...</div>
                     </div>
@@ -386,17 +402,6 @@
                     setTimeout(() => map.removeLayer(userMarker), 8000);
                     overlay.style.display = 'none';
                     overlay.innerHTML = '<div>📍 Getting your location... <div class="spinner"></div></div>';
-                    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`)
-                        .then(res => res.json())
-                        .then(data => {
-                            if (data.address) {
-                                const city = data.address.city || data.address.town || data.address.village || data.address.suburb;
-                                if (city) {
-                                    document.getElementById('placeInfo').style.display = 'block';
-                                    document.getElementById('placeInfo').innerHTML = `📍 You are near: <strong>${city}</strong><br>Showing scam reports in your area.`;
-                                }
-                            }
-                        });
                 },
                 (error) => {
                     alert('Could not get your location. Please allow location access.');
@@ -486,44 +491,6 @@
             return number.slice(0, 3) + '****' + number.slice(-3);
         }
         
-        function loadAllIncidents() {
-            const container = document.getElementById('allIncidentsList');
-            if (!container) return;
-            const reports = getReports();
-            const filterType = document.getElementById('filterType')?.value || 'all';
-            const filterPincode = document.getElementById('filterPincode')?.value || '';
-            let filteredReports = [...reports];
-            if (filterType !== 'all') {
-                filteredReports = filteredReports.filter(r => r.type === filterType);
-            }
-            if (filterPincode) {
-                filteredReports = filteredReports.filter(r => r.pincode === filterPincode);
-            }
-            if (filteredReports.length === 0) {
-                container.innerHTML = '<p>No incidents found. Be the first to report!</p>';
-                return;
-            }
-            container.innerHTML = filteredReports.map(report => `
-                <div class="alert-item" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;">
-                    <div style="flex: 1;">
-                        <span class="alert-type ${getAlertClass(report.type)}">${getAlertLabel(report.type)}</span>
-                        ${report.phoneNumber ? `<div class="alert-detail">📞 Number: ${maskNumber(report.phoneNumber)}</div>` : ''}
-                        ${report.link ? `<div class="alert-detail">🔗 Link: ${report.link.substring(0, 50)}${report.link.length > 50 ? '...' : ''}</div>` : ''}
-                        <div class="alert-description">${escapeHtml(report.description.substring(0, 150))}${report.description.length > 150 ? '...' : ''}</div>
-                        <div class="alert-meta" style="margin-top: 8px;">
-                            <span class="alert-location">📍 ${report.pincode || 'Unknown'}</span>
-                            <span class="alert-time">🕐 ${new Date(report.timestamp).toLocaleString()}</span>
-                        </div>
-                        <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
-                            <button onclick="generatePoliceReport(${report.id})" style="padding: 5px 10px; background: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;">
-                                📄 Download Police Report
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-        }
-        
         function getAlertClass(type) {
             const classes = {
                 'scam-call': 'scam-call',
@@ -533,6 +500,167 @@
                 'other': 'scam-call'
             };
             return classes[type] || 'scam-call';
+        }
+        
+        // PDF Police Report Generator
+        function generatePoliceReport(reportId) {
+            const reports = getReports();
+            const report = reports.find(r => r.id === reportId);
+            
+            if (!report) {
+                alert('Report not found!');
+                return;
+            }
+            
+            const reportDate = new Date(report.timestamp);
+            const formattedDate = reportDate.toLocaleDateString('en-IN');
+            const formattedTime = reportDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+            
+            const getTypeLabel = (type) => {
+                const labels = {
+                    'scam-call': '📞 Scam Call',
+                    'phishing': '🔗 Phishing Link',
+                    'upi-fraud': '💳 UPI / Payment Fraud',
+                    'sim-swap': '📱 SIM Swap Attempt',
+                    'other': '⚠️ Other Cyber Crime'
+                };
+                return labels[type] || 'Cyber Incident';
+            };
+            
+            const reportHTML = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Cyber Crime Report - ${report.id}</title>
+                    <style>
+                        * { margin: 0; padding: 0; box-sizing: border-box; }
+                        body { font-family: Arial, sans-serif; padding: 30px; }
+                        .header { background: #1e3c72; color: white; padding: 20px; text-align: center; }
+                        .logo { font-size: 28px; font-weight: bold; }
+                        .title-section { background: #f0f2f5; padding: 15px 20px; border-bottom: 2px solid #dc2626; }
+                        .report-title { font-size: 22px; font-weight: bold; color: #1e3c72; }
+                        .report-id { font-family: monospace; background: white; padding: 4px 10px; border-radius: 5px; display: inline-block; margin-top: 8px; }
+                        .section { padding: 15px 20px; border-bottom: 1px solid #ddd; }
+                        .section-title { font-size: 18px; font-weight: bold; color: #1e3c72; margin-bottom: 12px; border-left: 3px solid #dc2626; padding-left: 10px; }
+                        .field-row { margin: 8px 0; display: flex; }
+                        .field-label { width: 150px; font-weight: bold; color: #555; }
+                        .field-value { flex: 1; }
+                        .desc-box { background: #f8f9fa; padding: 12px; border-radius: 5px; margin-top: 8px; border-left: 3px solid #dc2626; }
+                        .badge { display: inline-block; padding: 3px 12px; border-radius: 15px; background: #fee2e2; color: #dc2626; font-size: 13px; }
+                        .checklist { margin-left: 25px; margin-top: 10px; }
+                        .checklist li { margin: 8px 0; }
+                        .signature-section { display: flex; justify-content: space-between; margin-top: 20px; flex-wrap: wrap; }
+                        .signature-box { text-align: center; flex: 1; }
+                        .signature-line { border-top: 1px solid #333; width: 200px; margin: 30px auto 8px; }
+                        .footer { background: #f8f9fa; padding: 12px; text-align: center; font-size: 11px; color: #666; }
+                        .important-note { background: #e8f0fe; padding: 12px; border-radius: 5px; margin-top: 15px; font-size: 12px; }
+                        @media print {
+                            body { padding: 0; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <div class="logo">🛡️ सुरक्षा Square</div>
+                        <div>Community Cyber Incident Reporting Platform</div>
+                    </div>
+                    
+                    <div class="title-section">
+                        <div class="report-title">🚨 Cyber Crime Incident Report</div>
+                        <div class="report-id">Report ID: ${report.id}</div>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">📋 Incident Details</div>
+                        <div class="field-row"><div class="field-label">Incident Type:</div><div class="field-value"><span class="badge">${getTypeLabel(report.type)}</span></div></div>
+                        <div class="field-row"><div class="field-label">Date:</div><div class="field-value">${formattedDate}</div></div>
+                        <div class="field-row"><div class="field-label">Time:</div><div class="field-value">${formattedTime} IST</div></div>
+                        <div class="field-row"><div class="field-label">Location (Pincode):</div><div class="field-value">${report.pincode}</div></div>
+                        <div class="field-row"><div class="field-label">Description:</div><div class="field-value"><div class="desc-box">${escapeHtml(report.description || 'No description provided')}</div></div></div>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">👤 Suspect Information</div>
+                        <div class="field-row"><div class="field-label">Phone Number:</div><div class="field-value">${report.phoneNumber ? `<strong style="color:#dc2626;">${report.phoneNumber}</strong>` : 'Not provided'}</div></div>
+                        <div class="field-row"><div class="field-label">Suspicious Link:</div><div class="field-value">${report.link ? report.link : 'Not provided'}</div></div>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">📌 Recommended Actions</div>
+                        <ul class="checklist">
+                            <li>Call 1930 (Cyber Crime Helpline) immediately</li>
+                            <li>File complaint at https://cybercrime.gov.in</li>
+                            <li>Contact your bank to freeze accounts</li>
+                            <li>Change passwords for all online accounts</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">✍️ Signatures</div>
+                        <div class="signature-section">
+                            <div class="signature-box"><div class="signature-line"></div><div>Victim Signature</div></div>
+                            <div class="signature-box"><div class="signature-line"></div><div>Police Officer Signature</div></div>
+                            <div class="signature-box"><div class="signature-line"></div><div>Date</div></div>
+                        </div>
+                    </div>
+                    
+                    <div class="important-note">
+                        <strong>📜 Note:</strong> This report is generated from सुरक्षा Square. Police authorities are requested to verify details and take appropriate action.
+                    </div>
+                    
+                    <div class="footer">
+                        <p>सुरक्षा Square — Securing India, One Report at a Time</p>
+                        <p>Report ID: ${report.id} | Generated: ${new Date().toLocaleString('en-IN')}</p>
+                    </div>
+                </body>
+                </html>
+            `;
+            
+            const element = document.createElement('div');
+            element.innerHTML = reportHTML;
+            document.body.appendChild(element);
+            
+            html2pdf().set({
+                margin: [8, 8, 8, 8],
+                filename: `Cyber_Crime_Report_${report.id}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            }).from(element).save().then(() => {
+                document.body.removeChild(element);
+            }).catch(err => {
+                alert('Failed to generate PDF. Please try again.');
+                document.body.removeChild(element);
+            });
+        }
+        
+        function loadAllIncidents() {
+            const container = document.getElementById('allIncidentsList');
+            if (!container) return;
+            const reports = getReports();
+            const filterType = document.getElementById('filterType')?.value || 'all';
+            const filterPincode = document.getElementById('filterPincode')?.value || '';
+            let filteredReports = [...reports];
+            if (filterType !== 'all') filteredReports = filteredReports.filter(r => r.type === filterType);
+            if (filterPincode) filteredReports = filteredReports.filter(r => r.pincode === filterPincode);
+            if (filteredReports.length === 0) {
+                container.innerHTML = '<p>No incidents found. Be the first to report!</p>';
+                return;
+            }
+            container.innerHTML = filteredReports.map(report => `
+                <div class="alert-item" style="padding: 15px; border-bottom: 1px solid #e0e0e0;">
+                    <span class="alert-type ${getAlertClass(report.type)}">${getAlertLabel(report.type)}</span>
+                    ${report.phoneNumber ? `<div class="alert-detail">📞 Number: ${maskNumber(report.phoneNumber)}</div>` : ''}
+                    ${report.link ? `<div class="alert-detail">🔗 Link: ${report.link.substring(0, 50)}...</div>` : ''}
+                    <div class="alert-description">${escapeHtml(report.description.substring(0, 150))}...</div>
+                    <div class="alert-meta" style="margin-top: 8px;">
+                        <span class="alert-location">📍 ${report.pincode}</span>
+                        <span class="alert-time">🕐 ${new Date(report.timestamp).toLocaleString()}</span>
+                    </div>
+                    <button class="pdf-btn" onclick="generatePoliceReport(${report.id})" style="margin-top: 10px;">📄 Download Police Report</button>
+                </div>
+            `).join('');
         }
         
         async function loadIncidentsOnMap() {
@@ -548,30 +676,16 @@
                 const markerColor = getMarkerColor(report.type);
                 const customIcon = L.divIcon({
                     html: `<div style="background-color: ${markerColor}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>`,
-                    className: 'custom-marker',
                     iconSize: [16, 16],
                     popupAnchor: [0, -8]
                 });
                 const marker = L.marker(coords, { icon: customIcon });
                 const popupContent = `
-                    <div style="min-width: 260px; font-family: 'Inter', sans-serif;">
-                        <strong style="color: ${markerColor}; font-size: 14px;">${getAlertLabel(report.type)}</strong>
-                        <p style="margin: 8px 0; font-size: 12px; color: #333; line-height: 1.4;">${escapeHtml(report.description.substring(0, 150))}${report.description.length > 150 ? '...' : ''}</p>
-                        <div style="font-size: 11px; color: #666; margin: 8px 0;">
-                            📍 Pincode: <strong>${report.pincode}</strong><br>
-                            🕐 ${new Date(report.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}<br>
-                            🆔 Report ID: ${report.id}
-                        </div>
-                        ${report.phoneNumber ? `<div style="font-size: 11px; margin: 5px 0;">📞 Scammer Number: <strong>${maskNumber(report.phoneNumber)}</strong></div>` : ''}
-                        ${report.link ? `<div style="font-size: 11px; margin: 5px 0;">🔗 Link: <span style="word-break: break-all;">${report.link.substring(0, 60)}</span></div>` : ''}
-                        <div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;">
-                            <button onclick="generatePoliceReport(${report.id})" style="padding: 6px 12px; background: #dc2626; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 500;">
-                                📄 Download Police Report
-                            </button>
-                            <button onclick="alert('Report to National Cyber Crime Portal: https://cybercrime.gov.in\\n\\nReference ID: ${report.id}')" style="padding: 6px 12px; background: #2a5298; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 11px;">
-                                🚨 Report to Cyber Cell
-                            </button>
-                        </div>
+                    <div style="min-width: 250px;">
+                        <strong style="color: ${markerColor};">${getAlertLabel(report.type)}</strong>
+                        <p style="margin: 8px 0; font-size: 12px;">${escapeHtml(report.description.substring(0, 100))}...</p>
+                        <div style="font-size: 11px; color: #666;">📍 ${report.pincode}<br>🕐 ${new Date(report.timestamp).toLocaleString()}</div>
+                        <button class="pdf-btn" onclick="generatePoliceReport(${report.id})" style="margin-top: 8px;">📄 Download Police Report</button>
                     </div>
                 `;
                 marker.bindPopup(popupContent);
@@ -580,603 +694,6 @@
             loadAllIncidents();
         }
         
-        // PDF Police Report Generator
-        // PDF Police Report Generator - IMPROVED VERSION
-function generatePoliceReport(reportId) {
-    const reports = getReports();
-    const report = reports.find(r => r.id === reportId);
-    
-    if (!report) {
-        alert('Report not found!');
-        return;
-    }
-    
-    // Format date properly
-    const reportDate = new Date(report.timestamp);
-    const formattedDate = reportDate.toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-    });
-    const formattedTime = reportDate.toLocaleTimeString('en-IN', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-    });
-    
-    // Get incident type badge color
-    const getTypeBadgeStyle = (type) => {
-        switch(type) {
-            case 'scam-call': return 'background: #fee2e2; color: #dc2626;';
-            case 'phishing': return 'background: #fed7aa; color: #ea580c;';
-            case 'upi-fraud': return 'background: #fef3c7; color: #d97706;';
-            case 'sim-swap': return 'background: #dbeafe; color: #2563eb;';
-            default: return 'background: #f0f2f5; color: #666;';
-        }
-    };
-    
-    const getTypeLabel = (type) => {
-        const labels = {
-            'scam-call': '📞 Scam Call',
-            'phishing': '🔗 Phishing Link',
-            'upi-fraud': '💳 UPI / Payment Fraud',
-            'sim-swap': '📱 SIM Swap Attempt',
-            'other': '⚠️ Other Cyber Crime'
-        };
-        return labels[type] || 'Cyber Incident';
-    };
-    
-    const reportHTML = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <title>Cyber Crime Report - ${report.id}</title>
-            <style>
-                * {
-                    margin: 0;
-                    padding: 0;
-                    box-sizing: border-box;
-                }
-                
-                body {
-                    font-family: 'Arial', 'Helvetica', sans-serif;
-                    background: white;
-                    padding: 30px;
-                    color: #1a1a2e;
-                    line-height: 1.5;
-                }
-                
-                /* Main container */
-                .report-container {
-                    max-width: 900px;
-                    margin: 0 auto;
-                    background: white;
-                    border: 1px solid #e0e0e0;
-                    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-                }
-                
-                /* Header with logo */
-                .header {
-                    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-                    color: white;
-                    padding: 30px;
-                    text-align: center;
-                }
-                
-                .logo {
-                    font-size: 36px;
-                    font-weight: 800;
-                    margin-bottom: 10px;
-                }
-                
-                .logo span {
-                    color: #ffd700;
-                }
-                
-                .subtitle {
-                    font-size: 14px;
-                    opacity: 0.9;
-                }
-                
-                /* Title section */
-                .title-section {
-                    background: #f8f9fa;
-                    padding: 20px 30px;
-                    border-bottom: 2px solid #dc2626;
-                }
-                
-                .report-title {
-                    font-size: 24px;
-                    font-weight: 700;
-                    color: #1e3c72;
-                }
-                
-                .report-id {
-                    font-family: monospace;
-                    background: white;
-                    padding: 5px 12px;
-                    border-radius: 5px;
-                    display: inline-block;
-                    margin-top: 10px;
-                    font-size: 14px;
-                    color: #dc2626;
-                    border: 1px solid #e0e0e0;
-                }
-                
-                /* Sections */
-                .section {
-                    padding: 20px 30px;
-                    border-bottom: 1px solid #e0e0e0;
-                }
-                
-                .section-title {
-                    font-size: 18px;
-                    font-weight: 700;
-                    color: #1e3c72;
-                    margin-bottom: 15px;
-                    padding-bottom: 8px;
-                    border-bottom: 2px solid #dc2626;
-                    display: inline-block;
-                }
-                
-                /* Two column layout for fields */
-                .fields-grid {
-                    display: table;
-                    width: 100%;
-                }
-                
-                .field-row {
-                    display: table-row;
-                }
-                
-                .field-label {
-                    display: table-cell;
-                    width: 160px;
-                    padding: 10px 0;
-                    font-weight: 600;
-                    color: #4a5568;
-                    vertical-align: top;
-                }
-                
-                .field-value {
-                    display: table-cell;
-                    padding: 10px 0;
-                    color: #1a1a2e;
-                    vertical-align: top;
-                }
-                
-                /* Description box */
-                .description-box {
-                    background: #f8f9fa;
-                    padding: 15px;
-                    border-radius: 8px;
-                    margin-top: 10px;
-                    border-left: 4px solid #dc2626;
-                    line-height: 1.6;
-                }
-                
-                /* Badge */
-                .incident-badge {
-                    display: inline-block;
-                    padding: 5px 15px;
-                    border-radius: 20px;
-                    font-size: 13px;
-                    font-weight: 600;
-                }
-                
-                /* Evidence box */
-                .evidence-box {
-                    background: #fef3c7;
-                    border: 1px solid #fde68a;
-                    border-radius: 8px;
-                    padding: 15px;
-                    margin-top: 10px;
-                }
-                
-                /* Checklist */
-                .checklist {
-                    list-style: none;
-                    padding-left: 0;
-                }
-                
-                .checklist li {
-                    padding: 8px 0;
-                    border-bottom: 1px solid #f0f0f0;
-                }
-                
-                .checklist li:before {
-                    content: "☐ ";
-                    font-size: 16px;
-                    margin-right: 10px;
-                }
-                
-                /* Two column checklist */
-                .checklist-2col {
-                    display: flex;
-                    flex-wrap: wrap;
-                }
-                
-                .checklist-2col li {
-                    width: 50%;
-                }
-                
-                /* Footer */
-                .footer {
-                    background: #f8f9fa;
-                    padding: 20px 30px;
-                    text-align: center;
-                    font-size: 11px;
-                    color: #94a3b8;
-                }
-                
-                /* Signature section */
-                .signature-section {
-                    display: flex;
-                    justify-content: space-between;
-                    margin-top: 30px;
-                    padding-top: 20px;
-                    flex-wrap: wrap;
-                    gap: 30px;
-                }
-                
-                .signature-box {
-                    flex: 1;
-                    text-align: center;
-                }
-                
-                .signature-line {
-                    margin-top: 40px;
-                    border-top: 1px solid #333;
-                    width: 200px;
-                    margin-left: auto;
-                    margin-right: auto;
-                }
-                
-                .signature-label {
-                    font-size: 11px;
-                    margin-top: 8px;
-                    color: #666;
-                }
-                
-                /* Important note */
-                .important-note {
-                    background: #e8f0fe;
-                    border-radius: 8px;
-                    padding: 15px;
-                    margin: 15px 0;
-                    font-size: 13px;
-                }
-                
-                hr {
-                    margin: 20px 0;
-                    border: none;
-                    border-top: 1px dashed #ccc;
-                }
-                
-                @media print {
-                    body {
-                        padding: 0;
-                    }
-                    .report-container {
-                        box-shadow: none;
-                        border: none;
-                    }
-                    .no-print {
-                        display: none;
-                    }
-                }
-            </style>
-        </head>
-        <body>
-            <div class="report-container">
-                <!-- Header -->
-                <div class="header">
-                    <div class="logo">🛡️ सुरक्षा <span>Square</span></div>
-                    <div class="subtitle">Community Cyber Incident Reporting Platform</div>
-                </div>
-                
-                <!-- Title -->
-                <div class="title-section">
-                    <div class="report-title">🚨 Cyber Crime Incident Report</div>
-                    <div class="report-id">Report ID: ${report.id}</div>
-                </div>
-                
-                <!-- Incident Details -->
-                <div class="section">
-                    <div class="section-title">📋 Incident Details</div>
-                    <div class="fields-grid">
-                        <div class="field-row">
-                            <div class="field-label">Incident Type:</div>
-                            <div class="field-value">
-                                <span class="incident-badge" style="${getTypeBadgeStyle(report.type)}">${getTypeLabel(report.type)}</span>
-                            </div>
-                        </div>
-                        <div class="field-row">
-                            <div class="field-label">Date of Incident:</div>
-                            <div class="field-value">${formattedDate}</div>
-                        </div>
-                        <div class="field-row">
-                            <div class="field-label">Time of Incident:</div>
-                            <div class="field-value">${formattedTime} IST</div>
-                        </div>
-                        <div class="field-row">
-                            <div class="field-label">Location (Pincode):</div>
-                            <div class="field-value">${report.pincode}</div>
-                        </div>
-                        <div class="field-row">
-                            <div class="field-label">Report Generated:</div>
-                            <div class="field-value">${new Date().toLocaleString('en-IN')} IST</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Description -->
-                <div class="section">
-                    <div class="section-title">📝 Incident Description</div>
-                    <div class="description-box">
-                        ${escapeHtml(report.description || 'No description provided')}
-                    </div>
-                </div>
-                
-                <!-- Suspect Information -->
-                <div class="section">
-                    <div class="section-title">👤 Suspect / Scammer Information</div>
-                    <div class="fields-grid">
-                        <div class="field-row">
-                            <div class="field-label">Phone Number:</div>
-                            <div class="field-value">
-                                ${report.phoneNumber ? `<strong style="font-size: 16px; color: #dc2626;">${report.phoneNumber}</strong>` : '<em>Not provided</em>'}
-                            </div>
-                        </div>
-                        <div class="field-row">
-                            <div class="field-label">Suspicious Link/URL:</div>
-                            <div class="field-value">
-                                ${report.link ? `<a href="${report.link}" style="word-break: break-all; color: #2a5298;">${report.link}</a>` : '<em>Not provided</em>'}
-                            </div>
-                        </div>
-                        <div class="field-row">
-                            <div class="field-label">Platform Used:</div>
-                            <div class="field-value">${report.link ? 'Website / Link' : (report.phoneNumber ? 'Phone Call / SMS' : 'Unknown')}</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Evidence Preservation -->
-                <div class="section">
-                    <div class="section-title">📸 Evidence Preservation Checklist</div>
-                    <div class="evidence-box">
-                        <p><strong>Before filing this report, have you:</strong></p>
-                        <ul class="checklist" style="margin-top: 10px; margin-left: 20px;">
-                            <li>Taken screenshots of the scam call/message?</li>
-                            <li>Saved the suspicious link without clicking?</li>
-                            <li>Not shared any OTP or password?</li>
-                            <li>Blocked the scammer's number?</li>
-                        </ul>
-                    </div>
-                </div>
-                
-                <!-- Police Action Checklist -->
-                <div class="section">
-                    <div class="section-title">📌 Recommended Police Actions</div>
-                    <ul class="checklist checklist-2col">
-                        <li>Register FIR under IT Act 2000</li>
-                        <li>Request CDR for suspect number</li>
-                        <li>Trace IP/location of suspicious link</li>
-                        <li>Alert local banks in pincode ${report.pincode}</li>
-                        <li>Add number to national blacklist</li>
-                        <li>Coordinate with cyber cell</li>
-                        <li>Issue public alert for similar scams</li>
-                        <li>Trace other victims of same number</li>
-                    </ul>
-                </div>
-                
-                <!-- Victim Action Checklist -->
-                <div class="section">
-                    <div class="section-title">⚠️ Immediate Actions for Victim</div>
-                    <ul class="checklist">
-                        <li>Call <strong>1930</strong> (National Cyber Crime Helpline) immediately</li>
-                        <li>File online complaint at <strong>https://cybercrime.gov.in</strong></li>
-                        <li>Contact your bank to freeze accounts/transactions</li>
-                        <li>Change passwords for all online accounts</li>
-                        <li>Enable two-factor authentication on all apps</li>
-                        <li>Keep this report as evidence reference</li>
-                    </ul>
-                </div>
-                
-                <!-- Signature Section -->
-                <div class="section">
-                    <div class="section-title">✍️ Official Signatures</div>
-                    <div class="signature-section">
-                        <div class="signature-box">
-                            <div class="signature-line"></div>
-                            <div class="signature-label">Victim / Reporter Signature</div>
-                        </div>
-                        <div class="signature-box">
-                            <div class="signature-line"></div>
-                            <div class="signature-label">Police Officer Signature & Stamp</div>
-                        </div>
-                        <div class="signature-box">
-                            <div class="signature-line"></div>
-                            <div class="signature-label">Date of Filing</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Important Legal Note -->
-                <div class="section">
-                    <div class="important-note">
-                        <strong>📜 Legal Note:</strong> This report is generated from सुरक्षा Square, a community-driven cyber incident reporting platform. 
-                        The information provided is based on citizen reporting. Police authorities are requested to verify the details 
-                        and take appropriate action under the Information Technology Act, 2000 and Bharatiya Nyaya Sanhita (BNS), 2023.
-                    </div>
-                </div>
-                
-                <!-- Footer -->
-                <div class="footer">
-                    <p>🇮🇳 सुरक्षा Square — सुरक्षित भारत, सशक्त नागरिक (Secure India, Empowered Citizens)</p>
-                    <p>This is an official incident report. Please file a formal complaint with your local police station or cyber cell.</p>
-                    <p>Report ID: ${report.id} | Generation Date: ${new Date().toLocaleString('en-IN')} | Version: 2.0</p>
-                </div>
-            </div>
-        </body>
-        </html>
-    `;
-    
-    // Create temporary element for PDF generation
-    const element = document.createElement('div');
-    element.innerHTML = reportHTML;
-    document.body.appendChild(element);
-    
-    // Generate PDF with better settings
-    html2pdf().set({
-        margin: [5, 5, 5, 5],
-        filename: `Cyber_Crime_Report_${report.id}_${formattedDate.replace(/\//g, '-')}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { 
-            scale: 2, 
-            letterRendering: true,
-            useCORS: true
-        },
-        jsPDF: { 
-            unit: 'mm', 
-            format: 'a4', 
-            orientation: 'portrait' 
-        }
-    }).from(element).save().then(() => {
-        document.body.removeChild(element);
-    }).catch(err => {
-        console.error('PDF generation failed:', err);
-        alert('Failed to generate PDF. Please try again.');
-        document.body.removeChild(element);
-    });
-}
-            
-            const getAlertLabelForPDF = (type) => {
-                const labels = {
-                    'scam-call': '📞 Scam Call',
-                    'phishing': '🔗 Phishing Link',
-                    'upi-fraud': '💳 UPI Fraud',
-                    'sim-swap': '📱 SIM Swap Attempt',
-                    'other': '⚠️ Other Scam'
-                };
-                return labels[type] || '⚠️ Alert';
-            };
-            
-            const reportHTML = `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="UTF-8">
-                    <title>Cyber Crime Police Report - ${report.id}</title>
-                    <style>
-                        * { margin: 0; padding: 0; box-sizing: border-box; }
-                        body { font-family: 'Arial', 'Inter', sans-serif; padding: 40px; color: #1a1a2e; line-height: 1.5; }
-                        .header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #dc2626; }
-                        .logo { font-size: 28px; font-weight: 800; color: #dc2626; }
-                        .title { font-size: 24px; margin-top: 10px; }
-                        .report-id { background: #f0f2f5; padding: 8px 15px; border-radius: 8px; font-family: monospace; display: inline-block; margin-top: 10px; }
-                        .section { margin: 25px 0; padding: 15px; background: #f8f9fa; border-radius: 8px; page-break-inside: avoid; }
-                        .section-title { font-size: 18px; font-weight: 700; margin-bottom: 15px; color: #dc2626; border-left: 4px solid #dc2626; padding-left: 12px; }
-                        .field { margin: 10px 0; display: flex; flex-wrap: wrap; }
-                        .field-label { font-weight: 600; width: 180px; color: #4a5568; }
-                        .field-value { flex: 1; }
-                        .incident-box { background: white; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; margin: 15px 0; }
-                        .evidence-note { background: #fef3c7; border-left: 4px solid #d97706; padding: 12px; margin: 15px 0; font-size: 12px; }
-                        .footer { margin-top: 40px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e0e0e0; padding-top: 20px; }
-                        .signature-line { margin-top: 40px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 20px; }
-                        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-                        td { padding: 8px; border-bottom: 1px solid #e0e0e0; }
-                        .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: #fee2e2; color: #dc2626; }
-                        @media print {
-                            body { padding: 20px; }
-                            .section { break-inside: avoid; }
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="header">
-                        <div class="logo">🛡️ सुरक्षा Square</div>
-                        <div class="title">Cyber Crime Incident Report</div>
-                        <div class="report-id">Report ID: ${report.id}</div>
-                    </div>
-                    
-                    <div class="section">
-                        <div class="section-title">📋 Incident Details</div>
-                        <div class="field">
-                            <div class="field-label">Incident Type:</div>
-                            <div class="field-value"><span class="badge">${getAlertLabelForPDF(report.type)}</span></div>
-                        </div>
-                        <div class="field">
-                            <div class="field-label">Date & Time:</div>
-                            <div class="field-value">${new Date(report.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })} IST</div>
-                        </div>
-                        <div class="field">
-                            <div class="field-label">Location (Pincode):</div>
-                            <div class="field-value">${report.pincode}</div>
-                        </div>
-                        <div class="field">
-                            <div class="field-label">Description:</div>
-                            <div class="field-value"><div class="incident-box">${escapeHtml(report.description)}</div></div>
-                        </div>
-                    </div>
-                    
-                    <div class="section">
-                        <div class="section-title">👤 Suspect Information</div>
-                        ${report.phoneNumber ? `<div class="field"><div class="field-label">Phone Number:</div><div class="field-value">${report.phoneNumber}</div></div>` : '<p><em>No phone number provided</em></p>'}
-                        ${report.link ? `<div class="field"><div class="field-label">Suspicious Link:</div><div class="field-value"><span style="word-break: break-all;">${report.link}</span></div></div>` : ''}
-                    </div>
-                    
-                    <div class="section">
-                        <div class="section-title">📝 Action Checklist for Police</div>
-                        <table>
-                            <tr><td width="30"><input type="checkbox"></td><td>Register FIR under relevant IT Act sections</td></tr>
-                            <tr><td><input type="checkbox"></td><td>Request call detail records (CDR) for suspect number</td></tr>
-                            <tr><td><input type="checkbox"></td><td>Trace IP/location of suspicious link</td></tr>
-                            <tr><td><input type="checkbox"></td><td>Alert local banks in pincode ${report.pincode} about this scam pattern</td></tr>
-                            <tr><td><input type="checkbox"></td><td>Coordinate with cyber cell for digital evidence collection</td></tr>
-                        </table>
-                    </div>
-                    
-                    <div class="evidence-note">
-                        <strong>⚠️ Important:</strong> This report was generated from सुरक्षा Square — a community cyber incident reporting platform. 
-                        The information above was provided by a citizen reporter. Police are requested to verify details and take appropriate action.
-                    </div>
-                    
-                    <div class="signature-line">
-                        <div><div>_________________________</div><div style="font-size: 11px;">Victim/Reporter Signature</div></div>
-                        <div><div>_________________________</div><div style="font-size: 11px;">Police Officer Signature & Stamp</div></div>
-                        <div><div>_________________________</div><div style="font-size: 11px;">Date & Time of Filing</div></div>
-                    </div>
-                    
-                    <div class="footer">
-                        <p>Report generated from सुरक्षा Square — Community Cyber Incident Reporting Platform</p>
-                        <p>Report ID: ${report.id} | Generated: ${new Date().toLocaleString('en-IN')}</p>
-                    </div>
-                </body>
-                </html>
-            `;
-            
-            const element = document.createElement('div');
-            element.innerHTML = reportHTML;
-            document.body.appendChild(element);
-            
-            html2pdf().set({
-                margin: [10, 10, 10, 10],
-                filename: `Cyber_Crime_Report_${report.id}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, letterRendering: true },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            }).from(element).save().then(() => {
-                document.body.removeChild(element);
-            }).catch(err => {
-                console.error('PDF generation failed:', err);
-                alert('Failed to generate PDF. Please try again.');
-                document.body.removeChild(element);
-            });
-        }
-        
-        // Event listeners
         document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => {
                 initMap();
