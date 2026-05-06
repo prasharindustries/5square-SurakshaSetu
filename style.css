@@ -77,6 +77,40 @@ body {
     cursor: pointer;
 }
 
+/* Language Switcher */
+.language-switcher {
+    display: flex;
+    gap: 5px;
+    margin-left: 20px;
+}
+
+.lang-btn {
+    background: none;
+    border: 1px solid #e0e0e0;
+    padding: 5px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+
+.lang-btn.active {
+    background: #2a5298;
+    color: white;
+    border-color: #2a5298;
+}
+
+.lang-btn:hover:not(.active) {
+    background: #f0f2f5;
+}
+
+/* Hindi font support */
+[lang="hi"] body,
+html:has(.lang-btn[data-lang="hi"].active) body {
+    font-family: 'Inter', 'Noto Sans Devanagari', sans-serif;
+}
+
 /* Hero Section */
 .hero {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -352,6 +386,13 @@ footer {
     min-height: 100px;
 }
 
+.form-group small {
+    display: block;
+    margin-top: 5px;
+    font-size: 12px;
+    color: #666;
+}
+
 /* Map Container */
 .map-container {
     height: 400px;
@@ -553,6 +594,93 @@ footer {
     color: #666;
 }
 
+/* Emergency Note */
+.emergency-note {
+    margin-top: 20px;
+    padding: 15px;
+    background: #fef3c7;
+    border-radius: 8px;
+    border-left: 4px solid #d97706;
+}
+
+/* Articles Grid for Awareness Page */
+.articles-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+    margin: 40px 0;
+}
+
+.article {
+    background: white;
+    padding: 25px;
+    border-radius: 16px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.article h2 {
+    margin-bottom: 15px;
+}
+
+.article ul {
+    margin-left: 20px;
+    line-height: 1.8;
+    margin-bottom: 15px;
+}
+
+.article p {
+    margin-top: 10px;
+}
+
+/* Quiz Button Styles */
+.quiz-btn {
+    margin: 5px;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.quiz-btn-correct {
+    background: #2a5298;
+    color: white;
+}
+
+.quiz-btn-wrong {
+    background: #e0e0e0;
+}
+
+.quiz-feedback {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+/* Helpline List */
+.helpline-item {
+    padding: 12px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.helpline-item:last-child {
+    border-bottom: none;
+}
+
+.helpline-number {
+    font-size: 18px;
+    font-weight: 600;
+    color: #2a5298;
+    margin-top: 5px;
+}
+
+.helpline-timing {
+    font-size: 11px;
+    color: #666;
+    margin-top: 3px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .hero-title {
@@ -573,10 +701,6 @@ footer {
         background: white;
         padding: 20px;
         box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-    }
-    
-    .mobile-menu-btn {
-        display: block;
     }
     
     .step {
@@ -604,6 +728,33 @@ footer {
         width: 80%;
         text-align: center;
     }
+    
+    .navbar .container {
+        flex-wrap: wrap;
+    }
+    
+    .language-switcher {
+        order: 2;
+        margin-left: auto;
+    }
+    
+    .mobile-menu-btn {
+        order: 3;
+    }
+    
+    .nav-links {
+        order: 4;
+        width: 100%;
+    }
+    
+    .stat-card {
+        min-width: auto;
+    }
+    
+    .emergency-numbers {
+        flex-direction: column;
+        gap: 20px;
+    }
 }
 
 /* Print Styles for Police Report */
@@ -614,7 +765,11 @@ footer {
     .search-container,
     .quick-links,
     .legend,
-    footer {
+    .language-switcher,
+    .mobile-menu-btn,
+    footer,
+    .emergency-box,
+    .btn {
         display: none;
     }
     
@@ -625,5 +780,10 @@ footer {
     .alert-item {
         break-inside: avoid;
         page-break-inside: avoid;
+    }
+    
+    .container {
+        padding: 0;
+        margin: 0;
     }
 }
