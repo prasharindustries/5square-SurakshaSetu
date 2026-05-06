@@ -46,8 +46,8 @@ Unlike traditional reporting portals that only log complaints after financial lo
 
 | | |
 |---|---|
-| **🌐 Website** | [https://prasharindustries.github.io/suraksha-square](https://prasharindustries.github.io/suraksha-square) |
-| **📧 Contact** | security@surakshasquare.in |
+| **🌐 Website** | [https://prasharindustries.github.io/Suraksha-Square/](https://prasharindustries.github.io/Suraksha-Square/) |
+| **📧 Contact** | Will be intimated soon |
 | **🏢 Author** | Prashar Industries |
 
 ---
@@ -110,7 +110,7 @@ One-click PDF export generates a standardized, professional report that can be s
 ## 🌐 Live Demo
 
 **Access the live platform:**
-https://prasharindustries.github.io/suraksha-square/
+[https://prasharindustries.github.io/suraksha-square/](https://prasharindustries.github.io/Suraksha-Square/)
 
 
 ### Test These Searches
