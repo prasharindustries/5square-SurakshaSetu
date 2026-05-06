@@ -110,6 +110,9 @@ body {
     text-decoration: none;
     font-weight: 600;
     transition: transform 0.2s, box-shadow 0.2s;
+    display: inline-block;
+    cursor: pointer;
+    border: none;
 }
 
 .btn:hover {
@@ -232,6 +235,7 @@ body {
     padding: 4px 12px;
     border-radius: 20px;
     font-size: 14px;
+    display: inline-block;
 }
 
 .alert-type.scam-call { background: #fee2e2; color: #dc2626; }
@@ -247,6 +251,18 @@ body {
 .alert-time {
     color: #94a3b8;
     font-size: 12px;
+}
+
+.alert-description {
+    margin-top: 8px;
+    color: #333;
+    font-size: 14px;
+}
+
+.alert-detail {
+    font-size: 12px;
+    color: #666;
+    margin-top: 4px;
 }
 
 /* Emergency Box */
@@ -348,6 +364,195 @@ footer {
     color: #666;
 }
 
+/* Search and Quick Links */
+.search-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.search-input-wrapper {
+    flex: 2;
+    position: relative;
+}
+
+.search-input {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 16px;
+}
+
+.search-btn {
+    padding: 12px 24px;
+    background: #2a5298;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.search-btn:hover {
+    background: #1e3c72;
+}
+
+/* Quick Links */
+.quick-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 15px 0;
+    align-items: center;
+}
+
+.quick-link {
+    background: #f0f2f5;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.quick-link:hover {
+    background: #e0e0e0;
+}
+
+/* Suggestions Dropdown */
+.suggestions-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.suggestion-item {
+    padding: 10px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.suggestion-item:hover {
+    background: #f0f2f5;
+}
+
+.suggestion-name {
+    font-weight: 500;
+}
+
+.suggestion-detail {
+    font-size: 11px;
+    color: #666;
+}
+
+/* Place Result Info */
+.place-result {
+    background: #e8f0fe;
+    padding: 10px;
+    border-radius: 8px;
+    margin-top: 10px;
+    font-size: 14px;
+    display: none;
+}
+
+/* Loading Overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    color: white;
+    font-size: 18px;
+}
+
+.loading-overlay div {
+    text-align: center;
+    background: #1a1a2e;
+    padding: 20px;
+    border-radius: 12px;
+}
+
+/* Spinner */
+.spinner {
+    width: 30px;
+    height: 30px;
+    border: 3px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 1s ease-in-out infinite;
+    margin: 10px auto;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Filter Bar */
+.filter-bar {
+    margin: 20px 0;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.filter-bar select,
+.filter-bar input {
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+}
+
+/* Legend for Map */
+.legend {
+    background: white;
+    padding: 10px;
+    border-radius: 8px;
+    position: absolute;
+    bottom: 20px;
+    right: 10px;
+    z-index: 1000;
+    font-size: 12px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 5px 0;
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+/* No Alerts Message */
+.no-alerts {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .hero-title {
@@ -380,5 +585,45 @@ footer {
     
     .stat-cards {
         flex-direction: column;
+    }
+    
+    .search-container {
+        flex-direction: column;
+    }
+    
+    .search-btn {
+        width: 100%;
+    }
+    
+    .hero-buttons {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .btn {
+        width: 80%;
+        text-align: center;
+    }
+}
+
+/* Print Styles for Police Report */
+@media print {
+    .navbar,
+    .hero-buttons,
+    .filter-bar,
+    .search-container,
+    .quick-links,
+    .legend,
+    footer {
+        display: none;
+    }
+    
+    body {
+        background: white;
+    }
+    
+    .alert-item {
+        break-inside: avoid;
+        page-break-inside: avoid;
     }
 }
